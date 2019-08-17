@@ -1,12 +1,10 @@
 require('dotenv').config()
-var massive = require('massive');
+const massive = require('massive');
+const express = require('express');
 
 const IgImport = require('./ig');
 
-const express = require('express');
-
 const app = module.exports = express();
-
 const {CONNECTION} = process.env;
 
 massive(CONNECTION)
