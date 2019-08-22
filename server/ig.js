@@ -15,23 +15,43 @@ class Ig {
     }
   }
 
+  async waitForMoreHandles (reference, initialCount, attempt = 0) {
+    console.log('more handles attempt', attempt)
+    if(attempt > 3) return;
+
+    const handles = await this.page.$$(reference);
+    const newCount = handles.length;
+
+    console.log(reference, newCount, initialCount)
+
+    if(initialCount <= newCount) {
+      await this.page.waitFor(1000);
+      return await this.waitForMoreHandles(reference, initialCount, attempt + 1);
+    } else {
+      return;
+    }
+  }
+
   async scrollUntilEnoughButtonsSayFollow (attempt = 0) {
     if(attempt > 15) return;
 
-    let buttonsThatSayFollowCount = 0;
-    const buttons = await this.page.$$(this.selectors.followersListButtons);
-
-    for(let i=0; i<buttons.length; i++) {
-      const buttonText = await page.evaluate(button => button.textContent, buttons[i]);
-      if(buttonText === "Follow") 
-        buttonsThatSayFollowCount ++;
-    }
+    const buttonsThatSayFollowCount = await this.page.evaluate((selectors) => {
+      let count = 0;
+      const buttons = document.querySelectorAll(selectors.followersListButtons);
+      buttons.forEach(button => {
+        if(button.innerText === 'Follow'){
+          count++;
+        }
+      });
+      return count;
+    }, this.selectors)
 
     if(buttonsThatSayFollowCount < this.actionLimit) {
       await this.page.evaluate(() => {
         document.querySelector('.PZuss').scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'end' });
       })
-      await this.page.waitFor(1000);
+
+      await this.waitForMoreHandles(this.selectors.followersListButtons, buttonsThatSayFollowCount);
 
       return await this.scrollUntilEnoughButtonsSayFollow(attempt + 1);
     } else {
@@ -47,8 +67,9 @@ class Ig {
 
     await this.scrollUntilEnoughButtonsSayFollow();
     console.log('hittt');
+    let i = 0;
     while (this.actionLimit > 0) {
-
+      console.log(this.actionLimit);
   
       this.actionLimit -= 1;
 
@@ -80,7 +101,7 @@ class Ig {
   }
 
   async followUnfollow () {
-    const allowedDailyActions = 200; // db call
+    const allowedDailyActions = 1000; // db call
     const scriptActions = Math.floor(allowedDailyActions / 24);
     this.actionLimit = scriptActions;
     console.log(this.actionLimit);
