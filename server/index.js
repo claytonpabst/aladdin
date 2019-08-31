@@ -1,12 +1,10 @@
 require('dotenv').config()
-var massive = require('massive');
+const massive = require('massive');
+const express = require('express');
 
 const IgImport = require('./ig');
 
-const express = require('express');
-
 const app = module.exports = express();
-
 const {CONNECTION} = process.env;
 
 massive(CONNECTION)
@@ -14,7 +12,7 @@ massive(CONNECTION)
   app.set('db', db);
 
   const Ig = new IgImport.Ig();
-  Ig.start();
+  Ig.start(app);
 
   app.listen(8080, () => {
     console.log('yooo')

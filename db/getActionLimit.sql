@@ -1,0 +1,1 @@
+select action_limit from aladdin_users where aladdin_users.id = $1;
