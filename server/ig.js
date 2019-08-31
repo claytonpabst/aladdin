@@ -2,6 +2,85 @@ const puppeteer = require('puppeteer');
 
 class Ig {
   constructor() {
+    this.cookies = [ 
+      { 
+        name: 'urlgen',
+        value: '"{\\"155.98.132.3\\": 17055}:1i0cdu:LJlxkWf0rQtuzxYHNhnUnbNs_tI"',
+        domain: '.instagram.com',
+        path: '/',
+        expires: -1,
+        size: 68,
+        httpOnly: true,
+        secure: true,
+        session: true },
+      { name: 'ds_user_id',
+        value: '4932599860',
+        domain: '.instagram.com',
+        path: '/',
+        expires: 1574216162.441692,
+        size: 20,
+        httpOnly: false,
+        secure: true,
+        session: false },
+      { name: 'rur',
+        value: 'FTW',
+        domain: '.instagram.com',
+        path: '/',
+        expires: -1,
+        size: 6,
+        httpOnly: true,
+        secure: true,
+        session: true },
+      { name: 'shbid',
+        value: '3212',
+        domain: '.instagram.com',
+        path: '/',
+        expires: 1567044959.663956,
+        size: 9,
+        httpOnly: true,
+        secure: true,
+        session: false },
+      { name: 'csrftoken',
+        value: 'yauGwkmTOrrODLOU9QQTuhLvbiMLCS3Z',
+        domain: '.instagram.com',
+        path: '/',
+        expires: 1597889762.441618,
+        size: 41,
+        httpOnly: false,
+        secure: true,
+        session: false },
+      { name: 'sessionid',
+        value: '4932599860%3AiJKRSuZxrsfc4t%3A11',
+        domain: '.instagram.com',
+        path: '/',
+        expires: 1597976159.664466,
+        size: 41,
+        httpOnly: true,
+        secure: true,
+        session: false },
+      { name: 'shbts',
+        value: '1566440159.5607789',
+        domain: '.instagram.com',
+        path: '/',
+        expires: 1567044959.664151,
+        size: 23,
+        httpOnly: true,
+        secure: true,
+        session: false 
+      },
+      { name: 'mid',
+        value: 'XV362gAEAAGtSyKbMssgpbsv1uXJ',
+        domain: '.instagram.com',
+        path: '/',
+        expires: 1881800154.188897,
+        size: 31,
+        httpOnly: false,
+        secure: true,
+        session: false 
+      } 
+    ]
+
+    this.unfollowActionLimit = 0;
     this.actionLimit = 0;
     this.search = [
       // "#concerts",
@@ -12,7 +91,12 @@ class Ig {
       followersContainer: ".PZuss",
       followersList: '.PZuss li',
       followersListButtons: '.PZuss li button',
+      followersListUsernames: '.PZuss li a.notranslate',
     }
+  }
+
+  randomNumber (min, max) {
+    return Math.floor(Math.random() * (max - min + 1) ) + min;
   }
 
   async waitForMoreHandles (reference, initialCount, attempt = 0) {
@@ -70,10 +154,23 @@ class Ig {
     let i = 0;
     while (this.actionLimit > 0) {
       console.log(this.actionLimit);
-  
-      this.actionLimit -= 1;
 
-    }
+      const followButtons = await this.page.$$(this.selectors.followersListButtons);
+      const buttonText = await this.page.evaluate(el => el.innerText, followButtons[i]);
+      const followersListUsernames = await this.page.$$(this.selectors.followersListUsernames);
+      const usernameToFollow = await this.page.evaluate(el => el.innerText, followersListUsernames[i]);
+      const followedBefore = await this.db.checkIfFollowedBefore(this.userId, usernameToFollow);
+      console.log(buttonText, followedBefore);
+
+      if(buttonText === "Follow" && !followedBefore.length) {
+        await this.db.markUsernameAsFollowed(this.userId, usernameToFollow, new Date().getTime());
+        await followButtons[i].click();
+        await this.page.waitFor(this.randomNumber(3000, 8000));
+        this.actionLimit -= 1;
+      }
+
+      i++;
+    } // end while
   }
   
   async followScript () {
@@ -82,7 +179,9 @@ class Ig {
     console.log(searchStr);
     if(searchStr.includes('@')) {
       await this.page.goto("https://www.instagram.com/" + searchStr.replace('@', ''));
-      await this.handleProfileTargeting();
+      const cookies = await this.page.cookies();
+      console.log(cookies);
+      // await this.handleProfileTargeting();
     } else if (searchStr.includes('#')) {
       console.log('idk');
     }
@@ -101,30 +200,41 @@ class Ig {
   }
 
   async followUnfollow () {
-    const allowedDailyActions = 1000; // db call
+    let allowedDailyActions = await this.db.getActionLimit(1); // return [{action_limit:300}]
+    allowedDailyActions = allowedDailyActions[0].action_limit
+    console.log(allowedDailyActions)
     const scriptActions = Math.floor(allowedDailyActions / 24);
-    this.actionLimit = scriptActions;
+    this.actionLimit = scriptActions / 2; // divide by 2 because unfollow gets half and follow gets half
+    this.unfollowActionLimit = scriptActions / 2
     console.log(this.actionLimit);
 
-    this.followScript();
-    // this.unfollowScript(scriptActions / 2);
+    await this.followScript();
+    await this.unfollowScript();
   }
 
   async launchBrowser () {
     const browser = await puppeteer.launch({headless: false});
     const pages = await browser.pages();
     this.page = await pages[0];
+    await this.page.setCookie(...this.cookies);
 
-    this.page.goto('https://www.instagram.com/accounts/login/');
+    this.page.goto('https://www.instagram.com');
+    // this.page.goto('https://www.instagram.com/accounts/login/');
   }
 
-  async start() {
+  async start(app) {
+    this.db = app.get('db');
     this.username = process.argv[2];
     this.password = process.argv[3];
+    this.userId = 1;
     console.log(this);
     await this.launchBrowser();
-    await this.login();
+    // await this.login();
     await this.followUnfollow();
+  }
+
+  async unfollowScript () {
+    // for(let i = 0; )
   }
 }
 

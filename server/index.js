@@ -12,7 +12,7 @@ massive(CONNECTION)
   app.set('db', db);
 
   const Ig = new IgImport.Ig();
-  Ig.start();
+  Ig.start(app);
 
   app.listen(8080, () => {
     console.log('yooo')
