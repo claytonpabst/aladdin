@@ -1,0 +1,1 @@
+select * from aladdin_follows where user_id = $1 and date_followed < $2
