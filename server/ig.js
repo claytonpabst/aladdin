@@ -235,18 +235,33 @@ class Ig {
     this.username = process.argv[2];
     this.password = process.argv[3];
     this.userId = 1;
-    console.log(this);
+    // console.log(this);
     await this.launchBrowser();
     // await this.login();
     await this.followUnfollow();
   }
 
   async unfollowScript () {
-    const profilesToUnfollow = await this.db.getUserToUnfollow(this.userId, new Date().getTime() - (1000 * 60 * 60 * 24 * 3));
+    const profilesToUnfollow = await this.db.getUserToUnfollow(this.userId, new Date().getTime() - (1000 * 60 * 60 * 24 * 1));
+    console.log(profilesToUnfollow.length)
     for(let i=0; i<this.unfollowActionLimit; i++) {
       if(profilesToUnfollow[i]) {
-        await this.page.goto("https://www.instagram.com/" + profilesToUnfollow[i].profile_name);
-
+        console.log(profilesToUnfollow[i])
+        try{
+          await this.page.goto("https://www.instagram.com/" + profilesToUnfollow[i].profile_name);
+          await this.page.waitForSelector('.-nal3');
+          await this.page.waitFor(1000);
+          let buttons = await this.page.$$('button');
+          await buttons[0].click();
+          await this.page.waitFor(2000);
+          await this.page.waitForSelector('div.piCib');
+          buttons = await this.page.$$('button');
+          await buttons[3].click();
+          await this.db.deleteUsernameFromFollows(this.userId, profilesToUnfollow[i].profile_name);
+          await this.page.waitFor(this.randomNumber(3000, 8000));
+        } catch (e) {
+          console.log('error unfollowing someone')
+        }
       }
     }
     await this.browser.close();

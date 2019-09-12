@@ -7,6 +7,8 @@ const IgImport = require('./ig');
 const app = module.exports = express();
 const {CONNECTION} = process.env;
 
+let timesScriptHasRun = 2
+
 massive(CONNECTION)
 .then( db => {
   app.set('db', db);
@@ -15,6 +17,8 @@ massive(CONNECTION)
 
   Ig.start(app);
   setInterval(() => {
+    console.log('Script has run ' + timesScriptHasRun + ' times.');
+    timesScriptHasRun++;
     Ig.start(app);
   }, 1000 * 60 * 60)
 
