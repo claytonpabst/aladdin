@@ -163,7 +163,7 @@ class Ig {
       console.log(buttonText, followedBefore);
 
       if(buttonText === "Follow" && !followedBefore.length) {
-        await this.db.markUsernameAsFollowed(this.userId, usernameToFollow, new Date().getTime());
+        await this.db.markUsernameAsFollowed(this.userId, usernameToFollow, new Date().getTime(), false);
         await followButtons[i].click();
         await this.page.waitFor(this.randomNumber(3000, 8000));
         this.actionLimit -= 1;
@@ -180,8 +180,8 @@ class Ig {
     if(searchStr.includes('@')) {
       await this.page.goto("https://www.instagram.com/" + searchStr.replace('@', ''));
       const cookies = await this.page.cookies();
-      console.log(cookies);
-      // await this.handleProfileTargeting();
+      // console.log(cookies);
+      await this.handleProfileTargeting();
     } else if (searchStr.includes('#')) {
       console.log('idk');
     }
@@ -201,20 +201,28 @@ class Ig {
 
   async followUnfollow () {
     let allowedDailyActions = await this.db.getActionLimit(1); // return [{action_limit:300}]
-    allowedDailyActions = allowedDailyActions[0].action_limit
-    console.log(allowedDailyActions)
+    allowedDailyActions = allowedDailyActions[0].action_limit;
+    console.log(allowedDailyActions);
     const scriptActions = Math.floor(allowedDailyActions / 24);
     this.actionLimit = scriptActions / 2; // divide by 2 because unfollow gets half and follow gets half
     this.unfollowActionLimit = scriptActions / 2
     console.log(this.actionLimit);
 
-    await this.followScript();
-    await this.unfollowScript();
+    try{
+      await this.followScript();
+    } catch(e) {
+      console.log(e);
+    }
+    try{
+      await this.unfollowScript();
+    } catch(e) {
+      console.log(e);
+    }
   }
 
   async launchBrowser () {
-    const browser = await puppeteer.launch({headless: false});
-    const pages = await browser.pages();
+    this.browser = await puppeteer.launch({headless: false});
+    const pages = await this.browser.pages();
     this.page = await pages[0];
     await this.page.setCookie(...this.cookies);
 
@@ -227,14 +235,53 @@ class Ig {
     this.username = process.argv[2];
     this.password = process.argv[3];
     this.userId = 1;
-    console.log(this);
+    // console.log(this);
     await this.launchBrowser();
     // await this.login();
     await this.followUnfollow();
   }
 
   async unfollowScript () {
-    // for(let i = 0; )
+    const profilesToUnfollow = await this.db.getUserToUnfollow(this.userId, new Date().getTime() - (1000 * 60 * 60 * 24 * 1));
+    console.log(profilesToUnfollow.length)
+    for(let i=0; i<this.unfollowActionLimit; i++) {
+      if(profilesToUnfollow[i]) {
+        console.log(profilesToUnfollow[i])
+        try{
+          await this.page.goto("https://www.instagram.com/" + profilesToUnfollow[i].profile_name);
+          await this.page.waitForSelector('.-nal3', {timeout: 7000});
+          await this.page.waitFor(1000);
+          await this.clickButtonIfInnerTextFound(['Following', 'Requested']);
+          await this.page.waitFor(2000);
+          await this.page.waitForSelector('div.piCib', {timeout: 4000});
+          await this.clickButtonIfInnerTextFound(['Unfollow']);
+          await this.db.deleteUsernameFromFollows(this.userId, profilesToUnfollow[i].profile_name);
+          await this.page.waitFor(this.randomNumber(3000, 8000));
+        } catch (e) {
+          try{
+            await this.db.deleteUsernameFromFollows(this.userId, profilesToUnfollow[i].profile_name);
+          } catch (e2) {
+            console.log('error deleting user out of db');
+            console.log(e2);
+          }
+          console.log('error unfollowing someone');
+          console.log(e);
+        }
+      }
+    }
+    await this.browser.close();
+  }
+
+  async clickButtonIfInnerTextFound(targetTextArray) {
+    let buttons = await this.page.$$('button');
+    for(let i=0; i<buttons.length; i++) {
+      buttons = await this.page.$$('button');
+      // console.log(buttons);
+      const buttonInnerText = await this.page.evaluate(el => el.innerText, buttons[i]);
+      if(targetTextArray.includes(buttonInnerText)){
+        await buttons[i].click();
+      }
+    }
   }
 }
 
