@@ -249,22 +249,39 @@ class Ig {
         console.log(profilesToUnfollow[i])
         try{
           await this.page.goto("https://www.instagram.com/" + profilesToUnfollow[i].profile_name);
-          await this.page.waitForSelector('.-nal3');
+          await this.page.waitForSelector('.-nal3', {timeout: 7000});
           await this.page.waitFor(1000);
-          let buttons = await this.page.$$('button');
-          await buttons[0].click();
+          await this.clickButtonIfInnerTextFound(['Following', 'Requested']);
           await this.page.waitFor(2000);
-          await this.page.waitForSelector('div.piCib');
-          buttons = await this.page.$$('button');
-          await buttons[3].click();
+          await this.page.waitForSelector('div.piCib', {timeout: 4000});
+          await this.clickButtonIfInnerTextFound(['Unfollow']);
           await this.db.deleteUsernameFromFollows(this.userId, profilesToUnfollow[i].profile_name);
           await this.page.waitFor(this.randomNumber(3000, 8000));
         } catch (e) {
-          console.log('error unfollowing someone')
+          try{
+            await this.db.deleteUsernameFromFollows(this.userId, profilesToUnfollow[i].profile_name);
+          } catch (e2) {
+            console.log('error deleting user out of db');
+            console.log(e2);
+          }
+          console.log('error unfollowing someone');
+          console.log(e);
         }
       }
     }
     await this.browser.close();
+  }
+
+  async clickButtonIfInnerTextFound(targetTextArray) {
+    let buttons = await this.page.$$('button');
+    for(let i=0; i<buttons.length; i++) {
+      buttons = await this.page.$$('button');
+      // console.log(buttons);
+      const buttonInnerText = await this.page.evaluate(el => el.innerText, buttons[i]);
+      if(targetTextArray.includes(buttonInnerText)){
+        await buttons[i].click();
+      }
+    }
   }
 }
 
